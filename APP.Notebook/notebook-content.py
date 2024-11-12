@@ -70,6 +70,8 @@ from langgraph.prebuilt import create_react_agent
 # Workspace-dependent abfss path to the "silver_games_stats" table 
 lakehouse_table_path = "abfss://CS2_test@onelake.dfs.fabric.microsoft.com/CsHouse.Lakehouse/Tables/silver_games_stats"  # Adjust this path as needed
 
+data_source = "sample_data" # "sample_data" or "pipeline"
+
 # METADATA ********************
 
 # META {
@@ -162,11 +164,64 @@ embed = AzureOpenAIEmbeddings(
 
 # CELL ********************
 
-vector_store = Chroma(
-    collection_name="text_collection",
-    embedding_function=embed,
-    persist_directory="/lakehouse/default/Files/chroma_langchain_db_text", 
-)
+if data_source == "sample_data":
+    import os
+    import time
+
+    from langchain_chroma import Chroma
+    from langchain_openai import AzureOpenAIEmbeddings
+    from langchain_core.documents import Document
+
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    # Define the path to the main transcripts folder
+    folder_path = '/lakehouse/default/Files/transcripts/'
+
+    # Initialize an empty list to hold the document contents
+    documents = []
+
+    # Loop through each subfolder and file in the main folder
+    for root, _, files in os.walk(folder_path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            
+            # Check if the current item is a file
+            if os.path.isfile(file_path):
+                # Open the file and read its contents
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    text = file.read()
+    
+                # Split the text into chunks using RecursiveCharacterTextSplitter
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+                splits = text_splitter.split_text(text)
+    
+                # Create Document objects from the splits and add them to the document list
+                for chunk in splits:
+                    documents.append(Document(page_content=chunk))
+
+    vector_store = Chroma(
+        collection_name="text_collection",
+        embedding_function=embed,
+        persist_directory="/lakehouse/default/Files/chroma_langchain_db_text", 
+    )
+
+    # For every run, reset collection before populating with documents in the next cell, to avoid making duplicates
+    vector_store.reset_collection()
+
+    extend_list = []
+    chunk_size = 1100
+    for i in range(0, len(documents), chunk_size):
+        print("adding documents..")
+        vector_store.add_documents(documents[i:i + chunk_size])
+        extend_list.extend(documents[i:i + chunk_size])
+        print("sleeping...")
+        time.sleep(60)
+        
+else:
+    vector_store = Chroma(
+        collection_name="text_collection",
+        embedding_function=embed,
+        persist_directory="/lakehouse/default/Files/chroma_langchain_db_text", 
+    )
 
 # METADATA ********************
 
