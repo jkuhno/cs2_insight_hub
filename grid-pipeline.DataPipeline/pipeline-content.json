@@ -1,0 +1,81 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "aa78e2e1-0efd-4a6b-be54-7545cd4d598e",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "GRID_API_KEY": {
+              "value": "#your-grid-api-key ",
+              "type": "string"
+            },
+            "default_date": {
+              "value": "2024-11-01",
+              "type": "string"
+            }
+          }
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "GRID_API_query",
+        "description": "Connect to GRID API and get pro match data for the year 2024. Initial cleanup to avoid errors, saves the data to bronze layer Delta table.\n\n**PARAMS**\n\nGRID_API_KEY: get from grid.gg\n\ndefault_date: YYYY-MM-DD from which to start querying if starting from scratch",
+        "dependsOn": []
+      },
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "e399d58a-a7aa-48db-beac-99f9235b8ab2",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "GRID_validation",
+        "description": "validates and transforms the data to a source-of-truth silver layer Delta table",
+        "dependsOn": [
+          {
+            "activity": "GRID_API_query",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "8ce983bc-fd1f-4f0b-9d62-2a443eac11c2",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "GRID_gold",
+        "description": "Creates the tables for dimensional model star schema, for a gold layer. APP won't use this, use for visualization",
+        "dependsOn": [
+          {
+            "activity": "GRID_validation",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
